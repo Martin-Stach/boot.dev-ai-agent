@@ -27,13 +27,31 @@ def main():
 
     client = genai.Client(api_key=api_key)
     messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
-    generate_content(client, messages, args.verbose)
+        
+    for _ in range(20):
+      response, function_responses = generate_content(client, messages, args.verbose)
+      
+      if response.candidates:
+        for candidate in response.candidates:
+          # for part in candidate.content.parts:
+            # print(f"DEBUG part: function_call={part.function_call}, thought_signature={getattr(part, 'thought_signature', 'MISSING')}")
+          messages.append(candidate.content)
+          # messages.append([types.Content(role="model", parts=[types.Part(text=candidate)])])
+      
+      if not response.function_calls:
+        print(f"Final response: {response.text}")
+        exit(0)
+      
+      messages.append(types.Content(role="user", parts=function_responses))
+      
+    print("Model didn't responde with a final response")
+    exit(1)
 
 
 def generate_content(client, messages, verbose):
     response = client.models.generate_content(
-        # model="gemini-2.5-flash",
-        model="gemini-2.5-flash-lite",
+        model="gemini-2.5-flash",
+        # model="gemini-3.1-flash-light",
         contents=messages,
         config=types.GenerateContentConfig(system_instruction=system_prompt, temperature=0, tools=[available_functions])
     )
@@ -66,13 +84,15 @@ def generate_content(client, messages, verbose):
         if final_response is None:
           raise Exception("Final function response is None")
         
-        function_results.append(final_response)
+        function_results.append(function_call_result.parts[0])
+        # function_responses.append(final_response)
         
         if verbose:
           print(f"-> {function_call_result.parts[0].function_response.response}")
           
-      return
-    print(f"Response: {response.text}")
+      # return response, function_results
+    # print(f"Final response: {response.text}")
+    return response, function_results
 
 
 if __name__ == "__main__":
